@@ -1,0 +1,53 @@
+name: Auto Update PAC
+
+on:
+  schedule:
+    - cron: '18 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout my repo
+        uses: actions/checkout@v4
+
+      - name: Checkout genpac
+        uses: actions/checkout@v4
+        with:
+          repository: JinnLynn/genpac
+          ref: v2.0.1
+          path: genpac
+
+      - name: Checkout gfwlist
+        uses: actions/checkout@v4
+        with:
+          repository: gfwlist/gfwlist
+          path: gfwlist
+
+      - name: Install genpac
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-setuptools
+          cd genpac
+          sed -i 's/from collections import Callable/from collections.abc import Callable/g' $(grep -rl 'from collections import Callable' .)
+          sudo python3 setup.py install
+
+      - name: Generate PAC
+        run: |
+          genpac \
+            --pac-proxy "SOCKS5 127.0.0.1:10999" \
+            --gfwlist-url - \
+            --gfwlist-local gfwlist/gfwlist.txt \
+            -o gfwlist.pac
+          sed -i '1,7d' gfwlist.pac
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add gfwlist.pac
+          git diff --cached --quiet && exit 0
+          git commit -m "Update PAC - $(date '+%Y-%m-%d %H:%M')"
+          git push

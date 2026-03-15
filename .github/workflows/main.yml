@@ -37,7 +37,7 @@ jobs:
       - name: Generate PAC
         run: |
           genpac \
-            --pac-proxy "SOCKS5 127.0.0.1:10999" \
+            --pac-proxy "SOCKS5 127.0.0.1:10666" \
             --gfwlist-url - \
             --gfwlist-local gfwlist/gfwlist.txt \
             -o gfwlist.pac

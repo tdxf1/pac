@@ -1,8 +1,8 @@
-name: Auto Update PAC
+name: Auto update
 
 on:
   schedule:
-    - cron: '18 18 * * *'
+    - cron: '37 19 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,44 +10,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout my repo
-        uses: actions/checkout@v4
+      - name: Install packages
+        run: |
+          sudo apt-get install openssh-client python3-setuptools
 
-      - name: Checkout genpac
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
         with:
           repository: JinnLynn/genpac
           ref: v2.0.1
           path: genpac
 
-      - name: Checkout gfwlist
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: gfwlist/gfwlist
           path: gfwlist
 
-      - name: Install genpac
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-setuptools
+      - uses: petronny/git-config-user@master
+        with:
+          path: .
+
+      - run: |
           cd genpac
-          sed -i 's/from collections import Callable/from collections.abc import Callable/g' $(grep -rl 'from collections import Callable' .)
+          sed 's/from collections import Callable/from collections.abc import Callable/g' -i $(grep 'from collections import Callable' . -rIl)
           sudo python3 setup.py install
 
-      - name: Generate PAC
+      - name: Update
         run: |
-          genpac \
-            --pac-proxy "SOCKS5 127.0.0.1:10666" \
-            --gfwlist-url - \
-            --gfwlist-local gfwlist/gfwlist.txt \
-            -o gfwlist.pac
-          sed -i '1,7d' gfwlist.pac
+          set -x
 
-      - name: Commit and Push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          genpac --pac-proxy "SOCKS5 127.0.0.1:1080; SOCKS 127.0.0.1:1080; DIRECT;" --gfwlist-url - --gfwlist-local gfwlist/gfwlist.txt -o gfwlist.pac
+          sed '1,7d' -i gfwlist.pac
+
           git add gfwlist.pac
-          git diff --cached --quiet && exit 0
-          git commit -m "Update PAC - $(date '+%Y-%m-%d %H:%M')"
-          git push
+          git commit -m "[$(LANG=C date)] auto update" || exit 0
+
+          [ -n "${{ secrets.READ_ONLY }}" ] && git show && exit 0
+
+          git push origin master
